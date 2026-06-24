@@ -1,76 +1,83 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../lib/supabase';
+import {
+  fetchProfile, upsertProfile,
+  fetchTasks, upsertTask, deleteTaskDb,
+  fetchMoods, upsertMood,
+  fetchFocusSessions, insertFocusSession,
+  fetchQuizResults, insertQuizResult,
+} from '../services/dbService';
 import {
   User, Task, MoodEntry, FocusSession,
   QuizResult, ChatMessage, Goals, NotificationSettings, ThemeMode,
 } from '../constants/types';
 
-const STORAGE_KEY = 'studycompanion_state';
+const CHAT_KEY = 'studycompanion_chat';
 
 interface AppState {
-  // Auth & onboarding
   user: User | null;
   isAuthenticated: boolean;
   hasCompletedOnboarding: boolean;
-
-  // Theme
   themeMode: ThemeMode;
-
-  // Data
   tasks: Task[];
   moods: MoodEntry[];
   focusSessions: FocusSession[];
   quizResults: QuizResult[];
   chatMessages: ChatMessage[];
-
-  // Config
   goals: Goals;
   notificationSettings: NotificationSettings;
   apiKey: string;
-
-  // Loading
   isLoading: boolean;
 
-  // Actions — auth
+  // Auth
   signUp: (email: string, name: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   completeOnboarding: (name: string, studyGoal: string) => Promise<void>;
 
-  // Actions — theme
+  // Theme
   toggleTheme: () => void;
 
-  // Actions — tasks
+  // Tasks
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'completed'>) => void;
   completeTask: (id: string) => void;
   deleteTask: (id: string) => void;
 
-  // Actions — mood
+  // Mood
   saveMood: (mood: MoodEntry) => void;
 
-  // Actions — focus
+  // Focus
   addFocusSession: (session: Omit<FocusSession, 'id'>) => void;
 
-  // Actions — quiz
+  // Quiz
   saveQuizResult: (result: Omit<QuizResult, 'id'>) => void;
 
-  // Actions — chat
+  // Chat (local only)
   addChatMessage: (msg: Omit<ChatMessage, 'id'>) => void;
   clearChat: () => void;
 
-  // Actions — settings
+  // Settings
   updateGoals: (goals: Goals) => void;
   updateNotificationSettings: (s: NotificationSettings) => void;
   setApiKey: (key: string) => void;
 
-  // Persistence
+  // Init
   loadState: () => Promise<void>;
-  persist: () => Promise<void>;
+  loadUserData: (userId: string) => Promise<void>;
 }
 
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
+
+const DEFAULT_GOALS: Goals = { dailyTasks: 3, dailyFocusMinutes: 50 };
+const DEFAULT_NOTIF: NotificationSettings = {
+  studyReminders: true,
+  moodCheckIn: true,
+  taskDeadlines: true,
+  reminderHour: 9,
+};
 
 export const useAppStore = create<AppState>((set, get) => ({
   user: null,
@@ -82,59 +89,35 @@ export const useAppStore = create<AppState>((set, get) => ({
   focusSessions: [],
   quizResults: [],
   chatMessages: [],
-  goals: { dailyTasks: 3, dailyFocusMinutes: 50 },
-  notificationSettings: {
-    studyReminders: true,
-    moodCheckIn: true,
-    taskDeadlines: true,
-    reminderHour: 9,
-  },
+  goals: DEFAULT_GOALS,
+  notificationSettings: DEFAULT_NOTIF,
   apiKey: '',
   isLoading: true,
 
   signUp: async (email, name, password) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    if (!data.user) throw new Error('Sign up failed');
     const user: User = {
-      id: uid(),
+      id: data.user.id,
       name,
       email,
       studyGoal: '',
       createdAt: new Date().toISOString(),
     };
-    set({ user, isAuthenticated: true, isLoading: false });
-    await get().persist();
+    set({ user, isAuthenticated: true });
   },
 
   signIn: async (email, password) => {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed.user && parsed.user.email === email) {
-        set({
-          user: parsed.user,
-          isAuthenticated: true,
-          hasCompletedOnboarding: parsed.hasCompletedOnboarding ?? false,
-          tasks: parsed.tasks ?? [],
-          moods: parsed.moods ?? [],
-          focusSessions: parsed.focusSessions ?? [],
-          quizResults: parsed.quizResults ?? [],
-          chatMessages: parsed.chatMessages ?? [],
-          goals: parsed.goals ?? { dailyTasks: 3, dailyFocusMinutes: 50 },
-          notificationSettings: parsed.notificationSettings ?? {
-            studyReminders: true,
-            moodCheckIn: true,
-            taskDeadlines: true,
-            reminderHour: 9,
-          },
-          apiKey: parsed.apiKey ?? '',
-          themeMode: parsed.themeMode ?? 'dark',
-        });
-        return;
-      }
-    }
-    throw new Error('Invalid credentials');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (!data.user) throw new Error('Sign in failed');
+    await get().loadUserData(data.user.id);
   },
 
   signOut: async () => {
+    await supabase.auth.signOut();
+    await AsyncStorage.removeItem(CHAT_KEY);
     set({
       user: null,
       isAuthenticated: false,
@@ -144,8 +127,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       focusSessions: [],
       quizResults: [],
       chatMessages: [],
+      goals: DEFAULT_GOALS,
+      notificationSettings: DEFAULT_NOTIF,
+      apiKey: '',
     });
-    await AsyncStorage.removeItem(STORAGE_KEY);
   },
 
   completeOnboarding: async (name, studyGoal) => {
@@ -153,24 +138,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!user) return;
     const updated = { ...user, name, studyGoal };
     set({ user: updated, hasCompletedOnboarding: true });
-    await get().persist();
+    await upsertProfile(user.id, {
+      name,
+      study_goal: studyGoal,
+      onboarding_completed: true,
+    });
   },
 
   toggleTheme: () => {
     const next: ThemeMode = get().themeMode === 'dark' ? 'light' : 'dark';
     set({ themeMode: next });
-    get().persist();
+    const user = get().user;
+    if (user) upsertProfile(user.id, { theme_mode: next }).catch(() => {});
   },
 
   addTask: (task) => {
-    const newTask: Task = {
-      ...task,
-      id: uid(),
-      completed: false,
-      createdAt: new Date().toISOString(),
-    };
+    const newTask: Task = { ...task, id: uid(), completed: false, createdAt: new Date().toISOString() };
     set((s) => ({ tasks: [newTask, ...s.tasks] }));
-    get().persist();
+    const user = get().user;
+    if (user) upsertTask(user.id, newTask).catch(() => {});
   },
 
   completeTask: (id) => {
@@ -179,12 +165,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         t.id === id ? { ...t, completed: !t.completed, completedAt: new Date().toISOString() } : t
       ),
     }));
-    get().persist();
+    const updated = get().tasks.find((t) => t.id === id);
+    const user = get().user;
+    if (user && updated) upsertTask(user.id, updated).catch(() => {});
   },
 
   deleteTask: (id) => {
     set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
-    get().persist();
+    deleteTaskDb(id).catch(() => {});
   },
 
   saveMood: (mood) => {
@@ -192,106 +180,129 @@ export const useAppStore = create<AppState>((set, get) => ({
       const filtered = s.moods.filter((m) => m.date !== mood.date);
       return { moods: [mood, ...filtered] };
     });
-    get().persist();
+    const user = get().user;
+    if (user) upsertMood(user.id, mood).catch(() => {});
   },
 
   addFocusSession: (session) => {
     const newSession: FocusSession = { ...session, id: uid() };
     set((s) => ({ focusSessions: [newSession, ...s.focusSessions] }));
-    get().persist();
+    const user = get().user;
+    if (user) insertFocusSession(user.id, newSession).catch(() => {});
   },
 
   saveQuizResult: (result) => {
     const newResult: QuizResult = { ...result, id: uid() };
     set((s) => ({ quizResults: [newResult, ...s.quizResults] }));
-    get().persist();
+    const user = get().user;
+    if (user) insertQuizResult(user.id, newResult).catch(() => {});
   },
 
-  addChatMessage: (msg) => {
+  addChatMessage: async (msg) => {
     const newMsg: ChatMessage = { ...msg, id: uid() };
-    set((s) => ({ chatMessages: [...s.chatMessages, newMsg] }));
-    get().persist();
+    set((s) => {
+      const updated = [...s.chatMessages, newMsg];
+      AsyncStorage.setItem(CHAT_KEY, JSON.stringify(updated)).catch(() => {});
+      return { chatMessages: updated };
+    });
   },
 
   clearChat: () => {
     set({ chatMessages: [] });
-    get().persist();
+    AsyncStorage.removeItem(CHAT_KEY).catch(() => {});
   },
 
   updateGoals: (goals) => {
     set({ goals });
-    get().persist();
+    const user = get().user;
+    if (user) upsertProfile(user.id, {
+      daily_task_goal: goals.dailyTasks,
+      daily_focus_goal: goals.dailyFocusMinutes,
+    }).catch(() => {});
   },
 
   updateNotificationSettings: (notificationSettings) => {
     set({ notificationSettings });
-    get().persist();
+    const user = get().user;
+    if (user) upsertProfile(user.id, {
+      notif_study_reminders: notificationSettings.studyReminders,
+      notif_mood_checkin: notificationSettings.moodCheckIn,
+      notif_task_deadlines: notificationSettings.taskDeadlines,
+      notif_reminder_hour: notificationSettings.reminderHour,
+    }).catch(() => {});
   },
 
   setApiKey: (apiKey) => {
     set({ apiKey });
-    get().persist();
+    const user = get().user;
+    if (user) upsertProfile(user.id, { api_key: apiKey }).catch(() => {});
+  },
+
+  loadUserData: async (userId: string) => {
+    try {
+      const [profile, tasks, moods, focusSessions, quizResults, chatRaw] = await Promise.all([
+        fetchProfile(userId),
+        fetchTasks(userId),
+        fetchMoods(userId),
+        fetchFocusSessions(userId),
+        fetchQuizResults(userId),
+        AsyncStorage.getItem(CHAT_KEY),
+      ]);
+
+      const user: User = {
+        id: userId,
+        name: profile?.name ?? '',
+        email: '',
+        studyGoal: profile?.study_goal ?? '',
+        createdAt: profile?.created_at ?? new Date().toISOString(),
+      };
+
+      set({
+        user,
+        isAuthenticated: true,
+        hasCompletedOnboarding: profile?.onboarding_completed ?? false,
+        tasks: tasks ?? [],
+        moods: moods ?? [],
+        focusSessions: focusSessions ?? [],
+        quizResults: quizResults ?? [],
+        chatMessages: chatRaw ? JSON.parse(chatRaw) : [],
+        goals: {
+          dailyTasks: profile?.daily_task_goal ?? 3,
+          dailyFocusMinutes: profile?.daily_focus_goal ?? 50,
+        },
+        notificationSettings: {
+          studyReminders: profile?.notif_study_reminders ?? true,
+          moodCheckIn: profile?.notif_mood_checkin ?? true,
+          taskDeadlines: profile?.notif_task_deadlines ?? true,
+          reminderHour: profile?.notif_reminder_hour ?? 9,
+        },
+        apiKey: profile?.api_key ?? '',
+        themeMode: (profile?.theme_mode as ThemeMode) ?? 'dark',
+      });
+    } catch (_) {}
   },
 
   loadState: async () => {
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        set({
-          user: parsed.user ?? null,
-          isAuthenticated: parsed.isAuthenticated ?? false,
-          hasCompletedOnboarding: parsed.hasCompletedOnboarding ?? false,
-          tasks: parsed.tasks ?? [],
-          moods: parsed.moods ?? [],
-          focusSessions: parsed.focusSessions ?? [],
-          quizResults: parsed.quizResults ?? [],
-          chatMessages: parsed.chatMessages ?? [],
-          goals: parsed.goals ?? { dailyTasks: 3, dailyFocusMinutes: 50 },
-          notificationSettings: parsed.notificationSettings ?? {
-            studyReminders: true,
-            moodCheckIn: true,
-            taskDeadlines: true,
-            reminderHour: 9,
-          },
-          apiKey: parsed.apiKey ?? '',
-          themeMode: parsed.themeMode ?? 'dark',
-        });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // Get email from session
+        const email = session.user.email ?? '';
+        await get().loadUserData(session.user.id);
+        set((s) => ({ user: s.user ? { ...s.user, email } : null }));
       }
     } catch (_) {}
     set({ isLoading: false });
   },
-
-  persist: async () => {
-    const s = get();
-    const toSave = {
-      user: s.user,
-      isAuthenticated: s.isAuthenticated,
-      hasCompletedOnboarding: s.hasCompletedOnboarding,
-      tasks: s.tasks,
-      moods: s.moods,
-      focusSessions: s.focusSessions,
-      quizResults: s.quizResults,
-      chatMessages: s.chatMessages,
-      goals: s.goals,
-      notificationSettings: s.notificationSettings,
-      apiKey: s.apiKey,
-      themeMode: s.themeMode,
-    };
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-  },
 }));
 
-// Helper selectors
-export function getStreak(
-  tasks: Task[],
-  focusSessions: FocusSession[]
-): number {
+// ─── Selectors (unchanged) ────────────────────────────────────────────────────
+
+export function getStreak(tasks: Task[], focusSessions: FocusSession[]): number {
   const activityDates = new Set<string>([
     ...tasks.filter((t) => t.completed && t.completedAt).map((t) => t.completedAt!.slice(0, 10)),
     ...focusSessions.map((s) => s.date),
   ]);
-
   let streak = 0;
   const today = new Date();
   for (let i = 0; i < 365; i++) {
@@ -337,16 +348,12 @@ export const ACHIEVEMENTS = [
 ];
 
 export function getEarnedAchievements(
-  tasks: Task[],
-  focusSessions: FocusSession[],
-  quizResults: QuizResult[],
-  moods: MoodEntry[],
-  streak: number
+  tasks: Task[], focusSessions: FocusSession[],
+  quizResults: QuizResult[], moods: MoodEntry[], streak: number
 ): string[] {
   const earned: string[] = [];
   const completedTasks = tasks.filter((t) => t.completed);
   const totalFocusMin = focusSessions.filter((s) => s.type === 'work').reduce((a, s) => a + s.duration, 0);
-
   if (completedTasks.length >= 1) earned.push('first_task');
   if (streak >= 7) earned.push('week_streak');
   if (streak >= 30) earned.push('month_streak');
@@ -355,6 +362,5 @@ export function getEarnedAchievements(
   if (moods.length >= 7) earned.push('mood_7');
   if (quizResults.some((q) => q.score === q.total && q.total > 0)) earned.push('perfect_quiz');
   if (completedTasks.length >= 30) earned.push('tasks_30');
-
   return earned;
 }
