@@ -40,3 +40,15 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# IDEs and Editors
+.vscode/
+.idea/
+
+# Agent/AI metadata
+.claude/
+.gemini/
+
+# local configurations
+.npmrc
+
