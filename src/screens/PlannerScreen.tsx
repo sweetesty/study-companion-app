@@ -16,10 +16,10 @@ import { useTheme } from '../hooks/useTheme';
 import { Task } from '../constants/types';
 
 const QUICK_PRESETS = [
-  { label: '15 min', mins: 15, icon: '⚡' },
-  { label: '30 min', mins: 30, icon: '🕐' },
-  { label: '1 hour', mins: 60, icon: '⏰' },
-  { label: '2 hours', mins: 120, icon: '🕑' },
+  { label: '15 min', mins: 15 },
+  { label: '30 min', mins: 30 },
+  { label: '1 hour', mins: 60 },
+  { label: '2 hours', mins: 120 },
 ];
 
 const PRIORITIES = [
@@ -96,7 +96,7 @@ export default function PlannerScreen() {
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '📚 Study Reminder',
+          title: 'Study Reminder',
           body: `Time to work on: ${reminderTask.title}`,
           sound: true,
           ...(Platform.OS === 'android' ? { channelId: 'study-reminders' } : {}),
@@ -166,7 +166,7 @@ export default function PlannerScreen() {
               />
             </View>
             {progress === 1 && (
-              <Text style={s.allDoneText}>🎉 All done for today!</Text>
+              <Text style={s.allDoneText}>All done for today!</Text>
             )}
           </View>
         )}
@@ -195,7 +195,11 @@ export default function PlannerScreen() {
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
         {filtered.length === 0 ? (
           <View style={s.emptyState}>
-            <Text style={s.emptyIcon}>{filter === 'done' ? '🏆' : '📋'}</Text>
+            <View style={s.emptyIcon}>
+              {filter === 'done'
+                ? <Target size={48} color={theme.textMuted} />
+                : <CheckCircle size={48} color={theme.textMuted} />}
+            </View>
             <Text style={[s.emptyTitle, { color: theme.textPrimary }]}>
               {filter === 'done' ? 'No completed tasks yet' : 'No tasks here'}
             </Text>
@@ -344,7 +348,7 @@ export default function PlannerScreen() {
                   onPress={() => scheduleReminder(p.mins * 60)}
                   activeOpacity={0.75}
                 >
-                  <Text style={s.presetEmoji}>{p.icon}</Text>
+                  <Clock size={18} color="#6c47ff" />
                   <Text style={[s.presetLabel, { color: theme.textPrimary }]}>{p.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -497,8 +501,8 @@ const styles = (theme: any) => StyleSheet.create({
   // Header
   header: { paddingTop: 56, paddingBottom: 24, paddingHorizontal: 20 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  headerTitle: { color: '#fff', fontSize: 28, fontWeight: '800' },
-  headerDate: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 3 },
+  headerTitle: { color: theme.heroText, fontSize: 28, fontWeight: '800' },
+  headerDate: { color: theme.heroSubText, fontSize: 13, marginTop: 3 },
   headerStats: { flexDirection: 'row', gap: 8 },
   statPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#f59e0b22', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#f59e0b44' },
   statPillText: { color: '#f59e0b', fontSize: 12, fontWeight: '700' },
@@ -506,9 +510,9 @@ const styles = (theme: any) => StyleSheet.create({
   // Progress
   progressWrap: { gap: 6 },
   progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600' },
-  progressFraction: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '700' },
-  progressTrack: { height: 6, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' },
+  progressLabel: { color: theme.heroSubText, fontSize: 12, fontWeight: '600' },
+  progressFraction: { color: theme.heroSubText, fontSize: 12, fontWeight: '700' },
+  progressTrack: { height: 6, backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: 6, borderRadius: 3 },
   allDoneText: { color: '#10b981', fontSize: 12, fontWeight: '600', textAlign: 'center' },
 
@@ -523,7 +527,7 @@ const styles = (theme: any) => StyleSheet.create({
 
   // Empty state
   emptyState: { alignItems: 'center', paddingVertical: 60 },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyIcon: { marginBottom: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '700', marginBottom: 6 },
   emptyHint: { fontSize: 14 },
 

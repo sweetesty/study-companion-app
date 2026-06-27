@@ -22,7 +22,7 @@ function CircularTimer({ progress, color, size = 220, strokeWidth = 14 }: {
 
   return (
     <Svg width={size} height={size}>
-      <Circle cx={size / 2} cy={size / 2} r={radius} stroke="#2D2D2D" strokeWidth={strokeWidth} fill="transparent" />
+      <Circle cx={size / 2} cy={size / 2} r={radius} stroke={color + '22'} strokeWidth={strokeWidth} fill="transparent" />
       <Circle
         cx={size / 2} cy={size / 2} r={radius}
         stroke={color} strokeWidth={strokeWidth} fill="transparent"
@@ -63,10 +63,10 @@ export default function FocusScreen() {
       if (granted) {
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: isWorkSession ? '🎉 Focus session complete!' : '⏰ Break time is over!',
+            title: isWorkSession ? 'Focus session complete!' : 'Break time is over!',
             body: isWorkSession
               ? `${workMinutes} min done. Take a 5-minute break!`
-              : 'Time to get back to work 💪',
+              : 'Time to get back to work!',
             sound: true,
             ...(Platform.OS === 'android' ? { channelId: 'study-reminders' } : {}),
           },
@@ -91,7 +91,7 @@ export default function FocusScreen() {
       setTimeLeft(BREAK_MINUTES * 60);
       fireCompletionAlert(true);
     } else {
-      showToast('Break over! Time to focus 💪', 'info');
+      showToast('Break over! Time to focus.', 'info');
       fireCompletionAlert(false);
       setIsWork(true);
       setTimeLeft(workMinutes * 60);
@@ -143,7 +143,7 @@ export default function FocusScreen() {
       <LinearGradient colors={[theme.headerGradient[0], theme.headerGradient[2]]} style={s.header}>
         <Text style={s.headerTitle}>Focus Mode</Text>
         <Text style={s.headerSub}>
-          {isWork ? '🎯 Work Session' : '☕ Break Time'} · Session #{sessionCount + 1}
+          {isWork ? 'Work Session' : 'Break Time'} · Session #{sessionCount + 1}
         </Text>
       </LinearGradient>
 
@@ -224,7 +224,7 @@ export default function FocusScreen() {
 
       <CelebrationOverlay
         visible={showCelebration}
-        title="Focus Session Complete! 🎉"
+        title="Focus Session Complete!"
         message={`Great work! You've completed ${sessionCount} session${sessionCount > 1 ? 's' : ''} today. Take a 5-minute break!`}
         onClose={() => setShowCelebration(false)}
       />

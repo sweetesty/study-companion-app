@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard,
+  KeyboardEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -54,6 +55,13 @@ export default function CoachScreen() {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [chatMessages]);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 150);
+    });
+    return () => show.remove();
+  }, []);
 
   const send = async (text: string) => {
     const msgText = text.trim();
@@ -116,7 +124,11 @@ export default function CoachScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: theme.background }]}>
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'android' ? 0 : 0}
+    >
       {/* Header */}
       <LinearGradient colors={theme.headerGradient} style={s.header}>
         <View style={s.headerTop}>
@@ -420,7 +432,7 @@ const styles = (theme: any) => StyleSheet.create({
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatarOrb: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  headerTitle: { color: theme.heroText, fontSize: 18, fontWeight: '800' },
   onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10b981' },
   onlineText: { color: '#10b981', fontSize: 11, fontWeight: '600' },

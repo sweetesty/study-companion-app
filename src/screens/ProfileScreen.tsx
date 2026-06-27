@@ -86,7 +86,7 @@ export default function ProfileScreen() {
           {ACHIEVEMENTS.map((a) => {
             const earned = earnedIds.includes(a.id);
             return (
-              <View key={a.id} style={[s.achieveCard, { backgroundColor: theme.surface, borderColor: earned ? (ACHIEVE_ICONS[a.id]?.color ?? theme.yellow) + '66' : theme.border, opacity: earned ? 1 : 0.35 }]}>
+              <View key={a.id} style={[s.achieveCard, { backgroundColor: theme.surface, borderColor: earned ? (ACHIEVE_ICONS[a.id]?.color ?? theme.yellow) + '66' : theme.border }]}>
                 <View style={s.achieveIconWrap}>
                   {ACHIEVE_ICONS[a.id]?.icon ?? <Medal size={22} color={theme.textMuted} />}
                 </View>
@@ -185,7 +185,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Logout */}
-      <View style={[s.section, { marginBottom: 40 }]}>
+      <View style={[s.section, { marginBottom: 40, marginTop: 60 }]}>
         <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
           <LogOut size={18} color={theme.red} />
           <Text style={[s.logoutText, { color: theme.red }]}>Sign Out</Text>
@@ -235,11 +235,11 @@ const styles = (theme: any) =>
     root: { flex: 1, backgroundColor: theme.background },
     content: { paddingBottom: 40 },
     hero: { paddingTop: 64, paddingBottom: 32, alignItems: 'center' },
-    avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginBottom: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
-    avatarText: { color: '#fff', fontSize: 30, fontWeight: '700' },
-    name: { color: '#fff', fontSize: 22, fontWeight: '700' },
-    email: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 4 },
-    goal: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 8, fontStyle: 'italic' },
+    avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center', marginBottom: 14, borderWidth: 2, borderColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.15)' },
+    avatarText: { color: theme.heroText, fontSize: 30, fontWeight: '700' },
+    name: { color: theme.heroText, fontSize: 22, fontWeight: '700' },
+    email: { color: theme.heroSubText, fontSize: 13, marginTop: 4 },
+    goal: { color: theme.heroSubText, fontSize: 13, marginTop: 8, fontStyle: 'italic' },
     statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 20 },
     section: { paddingHorizontal: 20, marginTop: 20 },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },

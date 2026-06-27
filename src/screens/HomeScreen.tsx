@@ -6,7 +6,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import {
   Flame, Brain, Timer, Smile, BarChart2, ChevronRight, Zap, ClipboardList,
+  CheckSquare, Clock, BookOpen, PenLine, Trophy, Star, Heart, Award,
 } from 'lucide-react-native';
+
+const ACHIEVE_ICONS: Record<string, { icon: React.ReactNode; color: string }> = {
+  first_task:   { icon: <CheckSquare size={24} color="#10b981" />, color: '#10b981' },
+  week_streak:  { icon: <Flame size={24} color="#f97316" />,       color: '#f97316' },
+  quiz_5:       { icon: <BookOpen size={24} color="#8B5CF6" />,    color: '#8B5CF6' },
+  focus_600:    { icon: <Clock size={24} color="#3B82F6" />,       color: '#3B82F6' },
+  mood_7:       { icon: <Heart size={24} color="#ec4899" />,       color: '#ec4899' },
+  perfect_quiz: { icon: <Star size={24} color="#F59E0B" />,        color: '#F59E0B' },
+  tasks_30:     { icon: <Trophy size={24} color="#F59E0B" />,      color: '#F59E0B' },
+  month_streak: { icon: <Award size={24} color="#a78bfa" />,       color: '#a78bfa' },
+};
 import { useAppStore, getStreak, getTodayTasks, getTodayFocusMinutes, getEarnedAchievements, ACHIEVEMENTS } from '../store/useAppStore';
 import { useTheme } from '../hooks/useTheme';
 
@@ -14,10 +26,10 @@ const { width } = Dimensions.get('window');
 
 function greet(name: string) {
   const h = new Date().getHours();
-  if (h < 12) return `Good morning,\n${name} ☀️`;
-  if (h < 18) return `Good afternoon,\n${name} 🌤️`;
-  if (h < 22) return `Good evening,\n${name} 🌙`;
-  return `Night owl mode,\n${name} 🦉`;
+  if (h < 12) return `Good morning,\n${name}`;
+  if (h < 18) return `Good afternoon,\n${name}`;
+  if (h < 22) return `Good evening,\n${name}`;
+  return `Night owl mode,\n${name}`;
 }
 
 export default function HomeScreen() {
@@ -44,11 +56,11 @@ export default function HomeScreen() {
         {user?.studyGoal ? <Text style={s.subtitle}>{user.studyGoal}</Text> : null}
 
         <View style={s.heroStats}>
-          <HeroStat value={streak} label="day streak" icon="🔥" glow={theme.yellow} />
+          <HeroStat value={streak} label="day streak" icon={<Flame size={18} color={theme.yellow} />} glow={theme.yellow} />
           <View style={s.heroStatDivider} />
-          <HeroStat value={completed.length} label="done today" icon="✅" glow={theme.green} />
+          <HeroStat value={completed.length} label="done today" icon={<CheckSquare size={18} color={theme.green} />} glow={theme.green} />
           <View style={s.heroStatDivider} />
-          <HeroStat value={todayFocusMin} label="focus mins" icon="⏱" glow={theme.blue} />
+          <HeroStat value={todayFocusMin} label="focus mins" icon={<Clock size={18} color={theme.blue} />} glow={theme.blue} />
         </View>
       </LinearGradient>
 
@@ -85,7 +97,7 @@ export default function HomeScreen() {
         </View>
         {pending.length === 0 && completed.length === 0 ? (
           <View style={[s.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={s.emptyText}>No tasks today. Add some in Planner! 📝</Text>
+            <Text style={s.emptyText}>No tasks today. Add some in Planner!</Text>
           </View>
         ) : (
           <View style={[s.tasksCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -119,7 +131,7 @@ export default function HomeScreen() {
                 onPress={sg.action}
                 activeOpacity={0.8}
               >
-                <Text style={s.suggestEmoji}>{sg.emoji}</Text>
+                <View style={s.suggestIcon}>{sg.icon}</View>
                 <Text style={[s.suggestText, { color: theme.textSecondary }]}>{sg.text}</Text>
                 {sg.action && <ChevronRight size={16} color={theme.textMuted} />}
               </TouchableOpacity>
@@ -133,12 +145,15 @@ export default function HomeScreen() {
         <View style={[s.section, { marginBottom: 32 }]}>
           <Text style={s.sectionTitle}>Achievements</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.badgeRow}>
-            {ACHIEVEMENTS.filter((a) => earnedIds.includes(a.id)).map((a) => (
-              <View key={a.id} style={[s.badge, { backgroundColor: theme.surface, borderColor: theme.yellow + '44' }]}>
-                <Text style={s.badgeIcon}>{a.icon}</Text>
-                <Text style={[s.badgeTitle, { color: theme.textSecondary }]}>{a.title}</Text>
-              </View>
-            ))}
+            {ACHIEVEMENTS.filter((a) => earnedIds.includes(a.id)).map((a) => {
+              const ai = ACHIEVE_ICONS[a.id];
+              return (
+                <View key={a.id} style={[s.badge, { backgroundColor: theme.surface, borderColor: (ai?.color ?? theme.yellow) + '44' }]}>
+                  <View style={s.badgeIcon}>{ai?.icon ?? <Trophy size={24} color={theme.yellow} />}</View>
+                  <Text style={[s.badgeTitle, { color: theme.textSecondary }]}>{a.title}</Text>
+                </View>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -147,10 +162,10 @@ export default function HomeScreen() {
   );
 }
 
-function HeroStat({ value, label, icon, glow }: { value: number; label: string; icon: string; glow: string }) {
+function HeroStat({ value, label, icon, glow }: { value: number; label: string; icon: React.ReactNode; glow: string }) {
   return (
     <View style={heroStatStyles.wrap}>
-      <Text style={heroStatStyles.icon}>{icon}</Text>
+      <View style={heroStatStyles.iconWrap}>{icon}</View>
       <Text style={[heroStatStyles.value, { color: '#fff', textShadowColor: glow, textShadowRadius: 8 }]}>{value}</Text>
       <Text style={heroStatStyles.label}>{label}</Text>
     </View>
@@ -158,7 +173,7 @@ function HeroStat({ value, label, icon, glow }: { value: number; label: string; 
 }
 const heroStatStyles = StyleSheet.create({
   wrap: { flex: 1, alignItems: 'center' },
-  icon: { fontSize: 20, marginBottom: 2 },
+  iconWrap: { marginBottom: 4 },
   value: { fontSize: 28, fontWeight: '800', textShadowOffset: { width: 0, height: 0 } },
   label: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '500', marginTop: 1 },
 });
@@ -198,13 +213,13 @@ const styles2 = StyleSheet.create({
   label: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
 
-function buildSuggestions({ pending, completed, todayFocusMin, todayMood, streak, quizResults, goals, nav }: any) {
-  const list: { emoji: string; text: string; action?: () => void }[] = [];
-  if (!todayMood) list.push({ emoji: '😊', text: 'Log your mood for today to track your wellbeing.', action: () => nav.navigate('Mood') });
-  if (pending.length === 0 && completed.length === 0) list.push({ emoji: '📝', text: 'No tasks yet. Add something to your planner!', action: () => nav.navigate('Planner') });
-  if (todayFocusMin === 0) list.push({ emoji: '⏱️', text: 'Start a focus session to build your streak.', action: () => nav.navigate('Focus') });
-  if (streak >= 3) list.push({ emoji: '🔥', text: `Amazing! You're on a ${streak}-day streak. Keep it up!` });
-  if (quizResults.length === 0) list.push({ emoji: '🧠', text: 'Try the AI Quiz Generator to test your knowledge.', action: () => nav.navigate('Quiz') });
+function buildSuggestions({ pending, completed, todayFocusMin, todayMood, streak, quizResults, nav }: any) {
+  const list: { icon: React.ReactNode; text: string; action?: () => void }[] = [];
+  if (!todayMood) list.push({ icon: <Smile size={20} color="#10b981" />, text: 'Log your mood for today to track your wellbeing.', action: () => nav.navigate('Mood') });
+  if (pending.length === 0 && completed.length === 0) list.push({ icon: <PenLine size={20} color="#8B5CF6" />, text: 'No tasks yet. Add something to your planner!', action: () => nav.navigate('Planner') });
+  if (todayFocusMin === 0) list.push({ icon: <Clock size={20} color="#3B82F6" />, text: 'Start a focus session to build your streak.', action: () => nav.navigate('Focus') });
+  if (streak >= 3) list.push({ icon: <Flame size={20} color="#f97316" />, text: `You are on a ${streak}-day streak. Keep it up!` });
+  if (quizResults.length === 0) list.push({ icon: <BookOpen size={20} color="#8B5CF6" />, text: 'Try the AI Quiz Generator to test your knowledge.', action: () => nav.navigate('Quiz') });
   return list.slice(0, 3);
 }
 
@@ -212,10 +227,10 @@ const styles = (theme: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
   content: { paddingBottom: 16 },
   hero: { paddingTop: 60, paddingBottom: 28, paddingHorizontal: 24 },
-  greeting: { color: '#fff', fontSize: 28, fontWeight: '800', letterSpacing: -0.5, lineHeight: 36 },
-  subtitle: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 6, marginBottom: 20 },
-  heroStats: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 18, padding: 16, marginTop: 12 },
-  heroStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginHorizontal: 4 },
+  greeting: { color: theme.heroText, fontSize: 28, fontWeight: '800', letterSpacing: -0.5, lineHeight: 36 },
+  subtitle: { color: theme.heroSubText, fontSize: 13, marginTop: 6, marginBottom: 20 },
+  heroStats: { flexDirection: 'row', backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', borderRadius: 18, padding: 16, marginTop: 12 },
+  heroStatDivider: { width: 1, backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', marginHorizontal: 4 },
   section: { paddingHorizontal: 20, marginTop: 22 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionTitle: { color: theme.textPrimary, fontSize: 17, fontWeight: '700', marginBottom: 12 },
@@ -239,10 +254,10 @@ const styles = (theme: any) => StyleSheet.create({
   emptyText: { color: theme.textMuted, fontSize: 14 },
   suggestList: { gap: 8 },
   suggestCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14, borderWidth: 1 },
-  suggestEmoji: { fontSize: 22 },
+  suggestIcon: { width: 32, alignItems: 'center' },
   suggestText: { fontSize: 14, lineHeight: 20, flex: 1 },
   badgeRow: { gap: 10, paddingRight: 16 },
   badge: { borderRadius: 14, padding: 14, alignItems: 'center', minWidth: 80, borderWidth: 1 },
-  badgeIcon: { fontSize: 28, marginBottom: 4 },
+  badgeIcon: { marginBottom: 6, alignItems: 'center' as const },
   badgeTitle: { fontSize: 11, fontWeight: '600', textAlign: 'center' },
 });

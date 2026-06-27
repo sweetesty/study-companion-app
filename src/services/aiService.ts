@@ -41,6 +41,9 @@ async function callGroq(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg: string = (err as any)?.error?.message ?? '';
+    if (res.status === 429 || msg.includes('rate_limit')) {
+      throw new Error('Daily AI limit reached. Please try again in a few hours.');
+    }
     throw new Error('Something went wrong. Please try again.');
   }
 
