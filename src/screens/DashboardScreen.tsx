@@ -71,7 +71,7 @@ export default function DashboardScreen() {
 
   return (
     <View style={s.root}>
-      <LinearGradient colors={['#0d1a2d', theme.background]} style={s.header}>
+      <LinearGradient colors={[theme.headerGradient[0], theme.headerGradient[2]]} style={s.header}>
         <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn}>
           <ArrowLeft size={22} color={theme.textPrimary} />
         </TouchableOpacity>

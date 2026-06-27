@@ -7,18 +7,19 @@ import {
   fetchMoods, upsertMood,
   fetchFocusSessions, insertFocusSession,
   fetchQuizResults, insertQuizResult,
+  fetchChatMessages, insertChatMessage, deleteChatMessages,
 } from '../services/dbService';
 import {
   User, Task, MoodEntry, FocusSession,
   QuizResult, ChatMessage, Goals, NotificationSettings, ThemeMode,
 } from '../constants/types';
 
-const CHAT_KEY = 'studycompanion_chat';
 
 interface AppState {
   user: User | null;
   isAuthenticated: boolean;
   hasCompletedOnboarding: boolean;
+  hasSeenIntro: boolean;
   themeMode: ThemeMode;
   tasks: Task[];
   moods: MoodEntry[];
@@ -35,6 +36,7 @@ interface AppState {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   completeOnboarding: (name: string, studyGoal: string) => Promise<void>;
+  markIntroSeen: () => void;
 
   // Theme
   toggleTheme: () => void;
@@ -79,10 +81,13 @@ const DEFAULT_NOTIF: NotificationSettings = {
   reminderHour: 9,
 };
 
+const INTRO_KEY = 'studycompanion_intro_seen';
+
 export const useAppStore = create<AppState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   hasCompletedOnboarding: false,
+  hasSeenIntro: false,
   themeMode: 'dark',
   tasks: [],
   moods: [],
@@ -98,13 +103,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
     if (!data.user) throw new Error('Sign up failed');
-    const user: User = {
-      id: data.user.id,
+    const now = new Date().toISOString();
+    const user: User = { id: data.user.id, name, email, studyGoal: '', createdAt: now };
+    await upsertProfile(data.user.id, {
       name,
-      email,
-      studyGoal: '',
-      createdAt: new Date().toISOString(),
-    };
+      onboarding_completed: false,
+      created_at: now,
+    }).catch(() => {});
     set({ user, isAuthenticated: true });
   },
 
@@ -116,12 +121,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   signOut: async () => {
-    await supabase.auth.signOut();
-    await AsyncStorage.removeItem(CHAT_KEY);
+    const userId = get().user?.id;
+    try { await supabase.auth.signOut(); } catch (_) {}
+    if (userId) {
+      await AsyncStorage.removeItem(`study_notes_sessions_${userId}`).catch(() => {});
+    }
+    await AsyncStorage.removeItem(INTRO_KEY).catch(() => {});
     set({
       user: null,
       isAuthenticated: false,
       hasCompletedOnboarding: false,
+      hasSeenIntro: false,
       tasks: [],
       moods: [],
       focusSessions: [],
@@ -133,16 +143,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
+  markIntroSeen: () => {
+    set({ hasSeenIntro: true });
+    AsyncStorage.setItem(INTRO_KEY, '1').catch(() => {});
+  },
+
   completeOnboarding: async (name, studyGoal) => {
     const user = get().user;
     if (!user) return;
     const updated = { ...user, name, studyGoal };
     set({ user: updated, hasCompletedOnboarding: true });
-    await upsertProfile(user.id, {
+    upsertProfile(user.id, {
       name,
       study_goal: studyGoal,
       onboarding_completed: true,
-    });
+    }).catch(() => {});
   },
 
   toggleTheme: () => {
@@ -200,16 +215,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addChatMessage: async (msg) => {
     const newMsg: ChatMessage = { ...msg, id: uid() };
-    set((s) => {
-      const updated = [...s.chatMessages, newMsg];
-      AsyncStorage.setItem(CHAT_KEY, JSON.stringify(updated)).catch(() => {});
-      return { chatMessages: updated };
-    });
+    set((s) => ({ chatMessages: [...s.chatMessages, newMsg] }));
+    const userId = get().user?.id;
+    if (userId) insertChatMessage(userId, newMsg).catch(() => {});
   },
 
   clearChat: () => {
+    const userId = get().user?.id;
     set({ chatMessages: [] });
-    AsyncStorage.removeItem(CHAT_KEY).catch(() => {});
+    if (userId) deleteChatMessages(userId).catch(() => {});
   },
 
   updateGoals: (goals) => {
@@ -239,57 +253,68 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   loadUserData: async (userId: string) => {
+    // Fetch profile first — if it fails, still authenticate with defaults
+    let profile: any = null;
     try {
-      const [profile, tasks, moods, focusSessions, quizResults, chatRaw] = await Promise.all([
-        fetchProfile(userId),
-        fetchTasks(userId),
-        fetchMoods(userId),
-        fetchFocusSessions(userId),
-        fetchQuizResults(userId),
-        AsyncStorage.getItem(CHAT_KEY),
-      ]);
-
-      const user: User = {
-        id: userId,
-        name: profile?.name ?? '',
-        email: '',
-        studyGoal: profile?.study_goal ?? '',
-        createdAt: profile?.created_at ?? new Date().toISOString(),
-      };
-
-      set({
-        user,
-        isAuthenticated: true,
-        hasCompletedOnboarding: profile?.onboarding_completed ?? false,
-        tasks: tasks ?? [],
-        moods: moods ?? [],
-        focusSessions: focusSessions ?? [],
-        quizResults: quizResults ?? [],
-        chatMessages: chatRaw ? JSON.parse(chatRaw) : [],
-        goals: {
-          dailyTasks: profile?.daily_task_goal ?? 3,
-          dailyFocusMinutes: profile?.daily_focus_goal ?? 50,
-        },
-        notificationSettings: {
-          studyReminders: profile?.notif_study_reminders ?? true,
-          moodCheckIn: profile?.notif_mood_checkin ?? true,
-          taskDeadlines: profile?.notif_task_deadlines ?? true,
-          reminderHour: profile?.notif_reminder_hour ?? 9,
-        },
-        apiKey: profile?.api_key ?? '',
-        themeMode: (profile?.theme_mode as ThemeMode) ?? 'dark',
-      });
+      profile = await fetchProfile(userId);
     } catch (_) {}
+
+    // Fetch remaining data; failures produce empty arrays
+    const [tasks, moods, focusSessions, quizResults, chatMessages] = await Promise.allSettled([
+      fetchTasks(userId),
+      fetchMoods(userId),
+      fetchFocusSessions(userId),
+      fetchQuizResults(userId),
+      fetchChatMessages(userId),
+    ]).then((results) => results.map((r) => (r.status === 'fulfilled' ? r.value : null)));
+
+    const user: User = {
+      id: userId,
+      name: profile?.name ?? '',
+      email: '',
+      studyGoal: profile?.study_goal ?? '',
+      createdAt: profile?.created_at ?? new Date().toISOString(),
+    };
+
+    set({
+      user,
+      isAuthenticated: true,
+      hasCompletedOnboarding: profile?.onboarding_completed ?? false,
+      tasks: (tasks as Task[]) ?? [],
+      moods: (moods as MoodEntry[]) ?? [],
+      focusSessions: (focusSessions as FocusSession[]) ?? [],
+      quizResults: (quizResults as QuizResult[]) ?? [],
+      chatMessages: (chatMessages as ChatMessage[]) ?? [],
+      goals: {
+        dailyTasks: profile?.daily_task_goal ?? 3,
+        dailyFocusMinutes: profile?.daily_focus_goal ?? 50,
+      },
+      notificationSettings: {
+        studyReminders: profile?.notif_study_reminders ?? true,
+        moodCheckIn: profile?.notif_mood_checkin ?? true,
+        taskDeadlines: profile?.notif_task_deadlines ?? true,
+        reminderHour: profile?.notif_reminder_hour ?? 9,
+      },
+      apiKey: profile?.api_key ?? '',
+      themeMode: (profile?.theme_mode as ThemeMode) ?? 'dark',
+    });
   },
 
   loadState: async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // Get email from session
-        const email = session.user.email ?? '';
-        await get().loadUserData(session.user.id);
-        set((s) => ({ user: s.user ? { ...s.user, email } : null }));
+      const [sessionResult, introRaw] = await Promise.allSettled([
+        supabase.auth.getSession(),
+        AsyncStorage.getItem(INTRO_KEY),
+      ]);
+      const hasSeenIntro = introRaw.status === 'fulfilled' && introRaw.value === '1';
+      set({ hasSeenIntro });
+      if (sessionResult.status === 'fulfilled') {
+        const session = sessionResult.value.data.session;
+        if (session?.user) {
+          const email = session.user.email ?? '';
+          await get().loadUserData(session.user.id);
+          set((s) => ({ user: s.user ? { ...s.user, email } : null }));
+        }
       }
     } catch (_) {}
     set({ isLoading: false });

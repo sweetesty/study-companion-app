@@ -9,7 +9,7 @@ import { ArrowLeft, Brain, ChevronRight, RotateCcw } from 'lucide-react-native';
 import { useAppStore } from '../store/useAppStore';
 import { useToast } from '../components/Toast';
 import { useTheme } from '../hooks/useTheme';
-import { generateQuiz } from '../services/aiService';
+import { generateQuiz, hasGroqKey } from '../services/aiService';
 import { QuizQuestion } from '../constants/types';
 
 type Stage = 'config' | 'loading' | 'quiz' | 'results';
@@ -36,7 +36,7 @@ export default function QuizScreen() {
 
   const startQuiz = async () => {
     if (!topic.trim()) { showToast('Enter a topic first!', 'error'); return; }
-    if (!apiKey) { showToast('Add your Groq API key in Profile', 'error'); return; }
+    if (!hasGroqKey(apiKey)) { showToast('Add your Groq API key in Profile', 'error'); return; }
     setStage('loading');
     try {
       const qs = await generateQuiz(apiKey, topic.trim(), difficulty, count);
@@ -89,7 +89,7 @@ export default function QuizScreen() {
 
     return (
       <View style={s.root}>
-        <LinearGradient colors={['#1a0d2d', theme.background]} style={s.header}>
+        <LinearGradient colors={[theme.headerGradient[0], theme.headerGradient[2]]} style={s.header}>
           <TouchableOpacity onPress={() => setStage('config')} style={s.backBtn}>
             <ArrowLeft size={22} color={theme.textPrimary} />
           </TouchableOpacity>
@@ -160,7 +160,7 @@ export default function QuizScreen() {
     const pct = Math.round((score / questions.length) * 100);
     return (
       <View style={s.root}>
-        <LinearGradient colors={['#1a0d2d', theme.background]} style={s.header}>
+        <LinearGradient colors={[theme.headerGradient[0], theme.headerGradient[2]]} style={s.header}>
           <Text style={s.headerTitle}>Quiz Complete!</Text>
           <Text style={s.headerSub}>{topic} · {difficulty}</Text>
         </LinearGradient>
@@ -201,7 +201,7 @@ export default function QuizScreen() {
   // Config stage
   return (
     <View style={s.root}>
-      <LinearGradient colors={['#1a0d2d', theme.background]} style={s.header}>
+      <LinearGradient colors={[theme.headerGradient[0], theme.headerGradient[2]]} style={s.header}>
         <TouchableOpacity onPress={() => nav.goBack()} style={s.backBtn}>
           <ArrowLeft size={22} color={theme.textPrimary} />
         </TouchableOpacity>

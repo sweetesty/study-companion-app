@@ -23,6 +23,17 @@ export default function AuthScreen() {
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
+  const isPasswordWeak = mode === 'signup' && password.length > 0 &&
+    (password.length < 6 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password));
+
+  const passwordHint = password.length < 6
+    ? '⚠️ At least 6 characters required'
+    : !/[a-zA-Z]/.test(password)
+    ? '⚠️ Must include at least one letter'
+    : !/[0-9]/.test(password)
+    ? '⚠️ Must include at least one number'
+    : '';
+
   const switchMode = (next: 'login' | 'signup') => {
     Animated.sequence([
       Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
@@ -39,6 +50,10 @@ export default function AuthScreen() {
     }
     if (mode === 'signup' && !name.trim()) {
       showToast('Please enter your name', 'error');
+      return;
+    }
+    if (mode === 'signup' && (password.length < 6 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password))) {
+      showToast('Password needs 6+ chars with letters and numbers', 'error');
       return;
     }
     setLoading(true);
@@ -60,7 +75,7 @@ export default function AuthScreen() {
   const s = styles(theme);
 
   return (
-    <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={s.root} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}>
       <LinearGradient colors={[theme.background, theme.surface]} style={StyleSheet.absoluteFill} />
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         {/* Logo */}
@@ -104,9 +119,9 @@ export default function AuthScreen() {
 
           <View style={s.inputGroup}>
             <Text style={s.label}>Password</Text>
-            <View style={s.passRow}>
+            <View style={s.passWrap}>
               <TextInput
-                style={[s.input, { flex: 1, marginBottom: 0 }]}
+                style={[s.input, s.passInput, isPasswordWeak && s.inputError]}
                 placeholder="••••••••"
                 placeholderTextColor={theme.textMuted}
                 value={password}
@@ -117,13 +132,16 @@ export default function AuthScreen() {
                 {showPass ? <EyeOff size={18} color={theme.textMuted} /> : <Eye size={18} color={theme.textMuted} />}
               </TouchableOpacity>
             </View>
+            {isPasswordWeak && (
+              <Text style={s.errorHint}>{passwordHint}</Text>
+            )}
           </View>
 
           <TouchableOpacity
-            style={s.submitBtn}
+            style={[s.submitBtn, isPasswordWeak && { opacity: 0.4 }]}
             onPress={handleSubmit}
             activeOpacity={0.85}
-            disabled={loading}
+            disabled={loading || isPasswordWeak}
           >
             <LinearGradient colors={theme.gradient} style={s.submitGrad}>
               {loading ? (
@@ -151,7 +169,7 @@ export default function AuthScreen() {
 const styles = (theme: any) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: theme.background },
-    scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+    scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingBottom: 80 },
     logoWrap: { alignItems: 'center', marginBottom: 40 },
     logoCircle: {
       width: 72, height: 72, borderRadius: 20,
@@ -179,8 +197,11 @@ const styles = (theme: any) =>
       borderWidth: 1,
       borderColor: theme.inputBorder,
     },
-    passRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    eyeBtn: { padding: 12 },
+    inputError: { borderColor: '#ef4444' },
+    errorHint: { color: '#ef4444', fontSize: 12, marginTop: 6, fontWeight: '500' },
+    passWrap: { position: 'relative' },
+    passInput: { paddingRight: 48 },
+    eyeBtn: { position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 4 },
     submitBtn: { marginTop: 8, borderRadius: 14, overflow: 'hidden' },
     submitGrad: { paddingVertical: 16, alignItems: 'center' },
     submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },

@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  LogOut, Sun, Moon, Key, Bell, Target, Trophy, ChevronRight, Eye, EyeOff,
+  LogOut, Sun, Moon, Bell, Target, Trophy, ChevronRight,
+  CheckSquare, Clock, BookOpen, Flame, Star, Heart, Award, Medal,
 } from 'lucide-react-native';
 import { useAppStore, ACHIEVEMENTS, getEarnedAchievements, getStreak } from '../store/useAppStore';
 import { useToast } from '../components/Toast';
@@ -15,13 +16,22 @@ import { NotificationSettings } from '../constants/types';
 
 export default function ProfileScreen() {
   const { theme, isDark } = useTheme();
-  const { user, signOut, toggleTheme, apiKey, setApiKey, goals, updateGoals, notificationSettings, updateNotificationSettings, tasks, focusSessions, moods, quizResults } = useAppStore();
+  const { user, signOut, toggleTheme, goals, updateGoals, notificationSettings, updateNotificationSettings, tasks, focusSessions, moods, quizResults } = useAppStore();
   const { showToast } = useToast();
 
-  const [showKey, setShowKey] = useState(false);
-  const [keyInput, setKeyInput] = useState(apiKey);
   const [dailyTasks, setDailyTasks] = useState(goals.dailyTasks.toString());
   const [dailyFocus, setDailyFocus] = useState(goals.dailyFocusMinutes.toString());
+
+  const ACHIEVE_ICONS: Record<string, { icon: React.ReactNode; color: string }> = {
+    first_task:   { icon: <CheckSquare size={22} color="#10b981" />, color: '#10b981' },
+    week_streak:  { icon: <Flame size={22} color="#f97316" />,       color: '#f97316' },
+    quiz_5:       { icon: <BookOpen size={22} color="#8B5CF6" />,    color: '#8B5CF6' },
+    focus_600:    { icon: <Clock size={22} color="#3B82F6" />,       color: '#3B82F6' },
+    mood_7:       { icon: <Heart size={22} color="#ec4899" />,       color: '#ec4899' },
+    perfect_quiz: { icon: <Star size={22} color="#F59E0B" />,        color: '#F59E0B' },
+    tasks_30:     { icon: <Trophy size={22} color="#F59E0B" />,      color: '#F59E0B' },
+    month_streak: { icon: <Award size={22} color="#a78bfa" />,       color: '#a78bfa' },
+  };
 
   const streak = getStreak(tasks, focusSessions);
   const earnedIds = getEarnedAchievements(tasks, focusSessions, quizResults, moods, streak);
@@ -36,11 +46,6 @@ export default function ProfileScreen() {
     showToast('Goals updated!', 'success');
   };
 
-  const handleSaveKey = () => {
-    setApiKey(keyInput.trim());
-    showToast('API key saved!', 'success');
-  };
-
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -53,21 +58,21 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <LinearGradient colors={theme.gradient} style={s.hero}>
+      <LinearGradient colors={theme.heroGradient} style={s.hero}>
         <View style={s.avatar}>
           <Text style={s.avatarText}>{initials}</Text>
         </View>
         <Text style={s.name}>{user?.name ?? 'Student'}</Text>
         <Text style={s.email}>{user?.email ?? ''}</Text>
-        {user?.studyGoal ? <Text style={s.goal}>{user.studyGoal}</Text> : null}
+        {user?.studyGoal ? <Text style={s.goal}>{user.studyGoal.replace(/^\p{Emoji}\s*/u, '')}</Text> : null}
       </LinearGradient>
 
       {/* Stats */}
       <View style={s.statsRow}>
-        <MiniStat label="Tasks Done" value={tasks.filter((t) => t.completed).length} emoji="✅" theme={theme} />
-        <MiniStat label="Focus Hours" value={(totalFocusMin / 60).toFixed(1)} emoji="⏱️" theme={theme} />
-        <MiniStat label="Streak" value={`${streak}d`} emoji="🔥" theme={theme} />
-        <MiniStat label="Quizzes" value={quizResults.length} emoji="🧠" theme={theme} />
+        <MiniStat label="Tasks Done" value={tasks.filter((t) => t.completed).length} theme={theme} />
+        <MiniStat label="Focus Hours" value={(totalFocusMin / 60).toFixed(1)} theme={theme} />
+        <MiniStat label="Streak" value={`${streak}d`} theme={theme} />
+        <MiniStat label="Quizzes" value={quizResults.length} theme={theme} />
       </View>
 
       {/* Achievements */}
@@ -81,8 +86,10 @@ export default function ProfileScreen() {
           {ACHIEVEMENTS.map((a) => {
             const earned = earnedIds.includes(a.id);
             return (
-              <View key={a.id} style={[s.achieveCard, { backgroundColor: theme.surface, borderColor: earned ? theme.yellow + '66' : theme.border, opacity: earned ? 1 : 0.4 }]}>
-                <Text style={s.achieveIcon}>{a.icon}</Text>
+              <View key={a.id} style={[s.achieveCard, { backgroundColor: theme.surface, borderColor: earned ? (ACHIEVE_ICONS[a.id]?.color ?? theme.yellow) + '66' : theme.border, opacity: earned ? 1 : 0.35 }]}>
+                <View style={s.achieveIconWrap}>
+                  {ACHIEVE_ICONS[a.id]?.icon ?? <Medal size={22} color={theme.textMuted} />}
+                </View>
                 <Text style={[s.achieveTitle, { color: theme.textPrimary }]}>{a.title}</Text>
                 <Text style={[s.achieveDesc, { color: theme.textMuted }]}>{a.description}</Text>
               </View>
@@ -162,36 +169,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* API Key */}
-      <View style={s.section}>
-        <View style={s.sectionHeader}>
-          <Key size={16} color={theme.green} />
-          <Text style={s.sectionTitle}>Groq API Key</Text>
-        </View>
-        <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[s.apiNote, { color: theme.textMuted }]}>
-            Required for AI Quiz Generator and Study Coach. Get your free key at console.groq.com
-          </Text>
-          <View style={s.keyRow}>
-            <TextInput
-              style={[s.keyInput, { color: theme.textPrimary, borderColor: theme.inputBorder, backgroundColor: theme.inputBg }]}
-              value={keyInput}
-              onChangeText={setKeyInput}
-              secureTextEntry={!showKey}
-              placeholder="gsk_..."
-              placeholderTextColor={theme.textMuted}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity onPress={() => setShowKey(!showKey)} style={s.eyeBtn}>
-              {showKey ? <EyeOff size={18} color={theme.textMuted} /> : <Eye size={18} color={theme.textMuted} />}
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity style={s.saveBtn} onPress={handleSaveKey} activeOpacity={0.8}>
-            <Text style={[s.saveBtnText, { color: theme.green }]}>Save Key</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {/* Theme toggle */}
       <View style={s.section}>
         <TouchableOpacity
@@ -218,10 +195,9 @@ export default function ProfileScreen() {
   );
 }
 
-function MiniStat({ label, value, emoji, theme }: any) {
+function MiniStat({ label, value, theme }: any) {
   return (
     <View style={[miniStyles.box, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <Text style={miniStyles.emoji}>{emoji}</Text>
       <Text style={[miniStyles.value, { color: theme.textPrimary }]}>{value}</Text>
       <Text style={[miniStyles.label, { color: theme.textMuted }]}>{label}</Text>
     </View>
@@ -244,48 +220,44 @@ function ToggleRow({ label, value, onChange, theme }: { label: string; value: bo
 
 const miniStyles = StyleSheet.create({
   box: { flex: 1, borderRadius: 14, padding: 10, alignItems: 'center', borderWidth: 1 },
-  emoji: { fontSize: 18, marginBottom: 2 },
+  emoji: { marginBottom: 4 },
   value: { fontSize: 17, fontWeight: '700' },
   label: { fontSize: 9, textAlign: 'center', marginTop: 1 },
 });
 
 const toggleStyles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14 },
   label: { fontSize: 14 },
 });
 
 const styles = (theme: any) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: theme.background },
-    content: { paddingBottom: 16 },
-    hero: { paddingTop: 64, paddingBottom: 28, alignItems: 'center' },
-    avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
-    avatarText: { color: '#fff', fontSize: 28, fontWeight: '700' },
+    content: { paddingBottom: 40 },
+    hero: { paddingTop: 64, paddingBottom: 32, alignItems: 'center' },
+    avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginBottom: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
+    avatarText: { color: '#fff', fontSize: 30, fontWeight: '700' },
     name: { color: '#fff', fontSize: 22, fontWeight: '700' },
     email: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 4 },
-    goal: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 6, fontStyle: 'italic' },
-    statsRow: { flexDirection: 'row', gap: 8, padding: 16 },
-    section: { paddingHorizontal: 20, marginTop: 8 },
-    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+    goal: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 8, fontStyle: 'italic' },
+    statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 20 },
+    section: { paddingHorizontal: 20, marginTop: 20 },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
     sectionTitle: { color: theme.textPrimary, fontSize: 15, fontWeight: '700', flex: 1 },
     sectionCount: { color: theme.textMuted, fontSize: 12 },
-    card: { borderRadius: 16, padding: 16, borderWidth: 1 },
-    achieveGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    achieveCard: { width: '47%', borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1 },
-    achieveIcon: { fontSize: 26, marginBottom: 6 },
+    card: { borderRadius: 16, padding: 20, borderWidth: 1 },
+    achieveGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    achieveCard: { width: '47%', borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1 },
+    achieveIcon: { fontSize: 28, marginBottom: 8 },
     achieveTitle: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
-    achieveDesc: { fontSize: 10, textAlign: 'center', marginTop: 2, lineHeight: 14 },
-    goalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    achieveDesc: { fontSize: 10, textAlign: 'center', marginTop: 4, lineHeight: 15 },
+    goalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
     goalLabel: { color: theme.textSecondary, fontSize: 14 },
-    goalInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, width: 60, textAlign: 'center', fontSize: 14 },
-    saveBtn: { alignItems: 'center', paddingVertical: 10 },
+    goalInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: 64, textAlign: 'center', fontSize: 14 },
+    saveBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
     saveBtnText: { fontSize: 14, fontWeight: '700' },
-    apiNote: { fontSize: 12, lineHeight: 18, marginBottom: 10 },
-    keyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    keyInput: { flex: 1, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
-    eyeBtn: { padding: 8 },
-    themeBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 16, borderWidth: 1 },
+    themeBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 16, padding: 18, borderWidth: 1 },
     themeBtnText: { flex: 1, fontSize: 15, fontWeight: '500' },
-    logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: theme.red + '44', backgroundColor: theme.red + '11' },
+    logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: theme.red + '44', backgroundColor: theme.red + '11' },
     logoutText: { fontSize: 15, fontWeight: '700' },
   });

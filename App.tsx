@@ -27,7 +27,19 @@ function AppContent() {
           isLoading: false,
         }));
       } else if (event === 'SIGNED_OUT') {
-        await signOut();
+        // Reset state directly — don't call signOut() here as it would
+        // call supabase.auth.signOut() a second time from inside the event callback
+        useAppStore.setState({
+          user: null,
+          isAuthenticated: false,
+          hasCompletedOnboarding: false,
+          tasks: [],
+          moods: [],
+          focusSessions: [],
+          quizResults: [],
+          chatMessages: [],
+          apiKey: '',
+        });
       } else if (event === 'TOKEN_REFRESHED') {
         useAppStore.setState({ isLoading: false });
       }

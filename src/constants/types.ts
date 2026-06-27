@@ -77,4 +77,37 @@ export interface NotificationSettings {
   reminderHour: number;
 }
 
+export interface Flashcard {
+  front: string;
+  back: string;
+}
+
+export interface StudyContent {
+  quiz: QuizQuestion[];
+  studyQuestions: string[];
+  flashcards: Flashcard[];
+}
+
+export interface PlanTask {
+  title: string;
+  description: string;
+  dueDate: string;
+  duration: number; // minutes
+}
+
+export interface StudyPlan {
+  summary: string;
+  tasks: PlanTask[];
+  totalMinutes: number;
+}
+
+export interface SavedStudySession {
+  id: string;
+  title: string;
+  fileName?: string;
+  notesPreview: string;
+  createdAt: string;
+  content: StudyContent;
+}
+
 export type ThemeMode = 'dark' | 'light';
